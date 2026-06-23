@@ -396,6 +396,41 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════ PAGE: RÉINITIALISATION MOT DE PASSE -->
+<div id="page-reset-password" class="page">
+  <div class="auth-wrapper">
+    <div class="auth-box">
+      <h2>🔑 Nouveau mot de passe</h2>
+      <p id="rp-subtitle">Vérification du lien…</p>
+      <div id="rp-form" style="display:none">
+        <div class="form-group">
+          <label>Nouveau mot de passe</label>
+          <div style="position:relative">
+            <input type="password" id="rp-newpass" placeholder="Min. 8 caractères, 1 majuscule, 1 chiffre" style="padding-right:42px">
+            <button type="button" onclick="togglePasswordVisibility('rp-newpass', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted)">👁️</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Confirmer le mot de passe</label>
+          <div style="position:relative">
+            <input type="password" id="rp-confirmpass" placeholder="Répétez le mot de passe" style="padding-right:42px">
+            <button type="button" onclick="togglePasswordVisibility('rp-confirmpass', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted)">👁️</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="confirmPasswordReset()">Réinitialiser le mot de passe</button>
+      </div>
+      <div id="rp-error" style="display:none;text-align:center;padding:16px 0">
+        <p style="color:var(--red);font-size:14px;margin-bottom:16px">Ce lien est invalide ou a expiré.</p>
+        <button class="btn btn-secondary" onclick="navigate('login')">Retour à la connexion</button>
+      </div>
+      <div id="rp-success" style="display:none;text-align:center;padding:16px 0">
+        <p style="color:var(--green);font-size:14px;margin-bottom:16px">✅ Mot de passe réinitialisé avec succès !</p>
+        <button class="btn btn-primary" onclick="navigate('login')">Se connecter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="page-login" class="page">
   <div class="auth-wrapper">
     <div class="auth-box">
@@ -417,7 +452,10 @@
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
-        <input type="password" id="login-pass" placeholder="••••••••">
+        <div style="position:relative">
+          <input type="password" id="login-pass" placeholder="••••••••" style="padding-right:42px">
+          <button type="button" onclick="togglePasswordVisibility('login-pass', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted)">👁️</button>
+        </div>
       </div>
       <div style="text-align:right;margin:-8px 0 16px">
         <a onclick="openForgotPasswordModal()" style="font-size:12px;color:var(--amber);cursor:pointer;font-weight:600">Mot de passe oublié ?</a>
@@ -486,7 +524,17 @@
       </div>
       <div class="form-group">
         <label>Mot de passe</label>
-        <input type="password" id="reg-pass" placeholder="Min. 6 caractères">
+        <div style="position:relative">
+          <input type="password" id="reg-pass" placeholder="Min. 8 caractères, 1 majuscule, 1 chiffre" style="padding-right:42px">
+          <button type="button" onclick="togglePasswordVisibility('reg-pass', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted)">👁️</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Confirmer le mot de passe</label>
+        <div style="position:relative">
+          <input type="password" id="reg-confirm-pass" placeholder="Répétez le mot de passe" style="padding-right:42px">
+          <button type="button" onclick="togglePasswordVisibility('reg-confirm-pass', this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted)">👁️</button>
+        </div>
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="doRegister()">Créer mon compte</button>
       <div class="auth-switch">
@@ -894,7 +942,7 @@ function showLoader(show) {
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
 function navigate(page) {
-  var _allowedPages = ['home','login','register','reviews','track','admin','client-dashboard'];
+  var _allowedPages = ['home','login','register','reviews','track','admin','client-dashboard','reset-password'];
   if (_allowedPages.indexOf(page) === -1) return;
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   var target = document.getElementById('page-'+page);
@@ -1333,7 +1381,14 @@ function sendPasswordReset() {
     toast('Email déjà envoyé. Vérifiez votre boîte mail (et les spams).','info'); return;
   }
   showLoader(true);
-  auth.sendPasswordResetEmail(email).then(function() {
+  // ── Le lien renvoie vers CETTE page (page-reset-password), au lieu de
+  // la page générique Firebase par défaut (firebaseapp.com/__/auth/action),
+  // pour une expérience cohérente et fiable sur le propre domaine du site. ──
+  var actionCodeSettings = {
+    url: window.location.origin + window.location.pathname + '?mode=resetPassword',
+    handleCodeInApp: false
+  };
+  auth.sendPasswordResetEmail(email, actionCodeSettings).then(function() {
     _lastResetEmail = email;
     _lastResetTime = Date.now();
     showLoader(false);
@@ -1352,6 +1407,58 @@ function sendPasswordReset() {
   });
 }
 
+// ── GESTION DU LIEN DE RÉINITIALISATION (oobCode dans l'URL) ──
+function checkPasswordResetLink() {
+  var params = new URLSearchParams(window.location.search);
+  var mode = params.get('mode');
+  var oobCode = params.get('oobCode');
+  if (mode !== 'resetPassword' || !oobCode) return;
+
+  navigate('reset-password');
+  auth.verifyPasswordResetCode(oobCode).then(function(email) {
+    window._resetOobCode = oobCode;
+    window._resetEmail = email;
+    document.getElementById('rp-subtitle').textContent = 'Pour ' + email;
+    document.getElementById('rp-form').style.display = 'block';
+  }).catch(function() {
+    document.getElementById('rp-subtitle').style.display = 'none';
+    document.getElementById('rp-error').style.display = 'block';
+  });
+}
+
+function confirmPasswordReset() {
+  var newpass = document.getElementById('rp-newpass').value;
+  var confirmpass = document.getElementById('rp-confirmpass').value;
+  if (newpass.length < 8) { toast('Mot de passe : minimum 8 caractères','error'); return; }
+  if (!/[A-Z]/.test(newpass) || !/[0-9]/.test(newpass)) { toast('Le mot de passe doit contenir une majuscule et un chiffre','error'); return; }
+  if (newpass !== confirmpass) { toast('Les mots de passe ne correspondent pas','error'); return; }
+  if (!window._resetOobCode) { toast('Lien invalide','error'); return; }
+  showLoader(true);
+  auth.confirmPasswordReset(window._resetOobCode, newpass).then(function() {
+    showLoader(false);
+    document.getElementById('rp-form').style.display = 'none';
+    document.getElementById('rp-subtitle').style.display = 'none';
+    document.getElementById('rp-success').style.display = 'block';
+    toast('Mot de passe réinitialisé ! Vous pouvez vous connecter. 🎉','success');
+  }).catch(function(e) {
+    showLoader(false);
+    toast(safeErrorMsg(e), 'error');
+  });
+}
+
+// ── AFFICHER / MASQUER UN MOT DE PASSE ──
+function togglePasswordVisibility(inputId, btn) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
+
 function doRegister() {
   var fn      = sanitizeStr(document.getElementById('reg-firstname').value, 50);
   var ln      = sanitizeStr(document.getElementById('reg-lastname').value, 50);
@@ -1359,10 +1466,12 @@ function doRegister() {
   var phone   = sanitizeStr(document.getElementById('reg-phone').value, 20);
   var address = sanitizeStr(document.getElementById('reg-address').value, 200);
   var pass    = document.getElementById('reg-pass').value;
+  var confirmPass = document.getElementById('reg-confirm-pass').value;
   if (!fn || !ln || !email || !pass) { toast('Remplissez tous les champs obligatoires','error'); return; }
   if (!validateEmail(email)) { toast('Email invalide','error'); return; }
   if (pass.length < 8) { toast('Mot de passe : minimum 8 caractères requis','error'); return; }
   if (!/[A-Z]/.test(pass) || !/[0-9]/.test(pass)) { toast('Le mot de passe doit contenir une majuscule et un chiffre','error'); return; }
+  if (pass !== confirmPass) { toast('Les mots de passe ne correspondent pas','error'); return; }
   if (phone && !validatePhone(phone)) { toast('Numéro de téléphone invalide','error'); return; }
   showLoader(true);
   var createdUser = null;
@@ -2326,6 +2435,9 @@ var loginPassEl = document.getElementById('login-pass');
 var regPassEl   = document.getElementById('reg-pass');
 if (loginPassEl) loginPassEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
 if (regPassEl)   regPassEl.addEventListener('keydown',   function(e){ if (e.key === 'Enter') doRegister(); });
+
+// Vérifie si l'URL contient un lien de réinitialisation de mot de passe
+checkPasswordResetLink();
 
 </script>
 </body>
